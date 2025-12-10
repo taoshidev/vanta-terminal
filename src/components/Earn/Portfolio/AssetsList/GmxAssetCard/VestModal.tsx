@@ -1,5 +1,4 @@
 import { Trans, t } from "@lingui/macro";
-import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { ethers } from "ethers";
 import { useEffect, useMemo, useState } from "react";
 
@@ -51,7 +50,6 @@ export function VestModal({ isVisible, setIsVisible, processedData, reservedAmou
   const { chainId } = useChainId();
   const { signer, account, active } = useWallet();
   const { setPendingTxns } = usePendingTxns();
-  const { openConnectModal } = useConnectModal();
   const vestingData = useVestingData(account);
 
   const [selectedVault, setSelectedVault] = useState<VestVault>("gmx");
@@ -395,10 +393,8 @@ export function VestModal({ isVisible, setIsVisible, processedData, reservedAmou
     <Button
       variant="primary-action"
       className="w-full"
-      onClick={() => openConnectModal?.()}
-      disabled={!openConnectModal}
     >
-      <Trans>Connect Wallet</Trans>
+      <Trans>Sign In</Trans>
     </Button>
   );
 

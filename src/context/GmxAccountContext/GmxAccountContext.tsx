@@ -1,11 +1,9 @@
 import { PropsWithChildren, useCallback, useMemo, useState } from "react";
 import { createContext } from "use-context-selector";
-import { useAccount } from "wagmi";
 
 import { isDevelopment } from "config/env";
 import { SELECTED_NETWORK_LOCAL_STORAGE_KEY, SELECTED_SETTLEMENT_CHAIN_ID_KEY } from "config/localStorage";
-import { DEFAULT_SETTLEMENT_CHAIN_ID_MAP, isSettlementChain } from "config/multichain";
-import { areChainsRelated } from "domain/multichain/areChainsRelated";
+import { isSettlementChain } from "config/multichain";
 import { ARBITRUM, ARBITRUM_SEPOLIA, SettlementChainId, SourceChainId } from "sdk/configs/chains";
 
 export type GmxAccountModalView =
@@ -82,22 +80,12 @@ const getSettlementChainIdFromLocalStorage = () => {
 };
 
 export function GmxAccountContextProvider({ children }: PropsWithChildren) {
-  const { chainId: walletChainId } = useAccount();
-
+  // No longer using wallet chain ID - settlement chain is managed independently
   const [modalOpen, setModalOpen] = useState<GmxAccountContext["modalOpen"]>(false);
 
-  let [settlementChainId, setSettlementChainId] = useState<GmxAccountContext["settlementChainId"]>(
+  const [settlementChainId, setSettlementChainId] = useState<GmxAccountContext["settlementChainId"]>(
     getSettlementChainIdFromLocalStorage()
   );
-
-  if (walletChainId !== undefined && !areChainsRelated(settlementChainId, walletChainId as SourceChainId)) {
-    if (isSettlementChain(walletChainId as SettlementChainId)) {
-      settlementChainId = walletChainId as SettlementChainId;
-    } else {
-      settlementChainId =
-        DEFAULT_SETTLEMENT_CHAIN_ID_MAP[walletChainId as SourceChainId] ?? DEFAULT_SETTLEMENT_CHAIN_ID;
-    }
-  }
 
   const handleSetSettlementChainId = useCallback((chainId: SettlementChainId) => {
     setSettlementChainId(chainId);

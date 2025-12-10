@@ -1,23 +1,27 @@
-import { UseWalletClientReturnType, useAccount, useConnectorClient, useWalletClient } from "wagmi";
+import { useAuth } from "context/AuthContext";
 
-import { useEthersSigner } from "./useEthersSigner";
-
-export type WalletClient = UseWalletClientReturnType["data"];
+// Legacy type exports for backwards compatibility - stub type with optional methods
+export type WalletClient = {
+  watchAsset?: (params: { type: string; options: { address: string; symbol: string; decimals: number; image?: string } }) => Promise<boolean>;
+} | undefined;
 
 export default function useWallet() {
-  const { address, isConnected, connector, chainId } = useAccount();
-  const { data: connectorClient } = useConnectorClient();
-  const { data: walletClient } = useWalletClient();
-
-  const signer = useEthersSigner();
+  const { user, isAuthenticated } = useAuth();
 
   return {
-    account: address,
-    active: isConnected,
-    connector: connector!,
-    chainId: chainId,
-    signer: signer,
-    connectorClient,
-    walletClient,
+    // No wallet address - we use username/password auth, not wallet auth
+    // This prevents blockchain queries from using an invalid address
+    account: undefined as string | undefined,
+    active: isAuthenticated,
+    // These are no longer needed for the new auth system
+    connector: undefined as any,
+    chainId: undefined as number | undefined,
+    signer: undefined as any,
+    connectorClient: undefined as any,
+    walletClient: undefined as WalletClient,
+    // Expose user info for display
+    username: user?.username,
+    // User ID for API calls (not an Ethereum address)
+    userId: user?.id,
   };
 }

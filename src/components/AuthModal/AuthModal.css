@@ -1,0 +1,81 @@
+.AuthModal .Modal-content {
+  width: 100%;
+  max-width: 400px;
+}
+
+.AuthModal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.AuthModal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.AuthModal-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-gray-300);
+}
+
+.AuthModal-input {
+  width: 100%;
+  padding: 12px;
+  font-size: 14px;
+  color: var(--color-white);
+  background: var(--color-slate-700);
+  border: 1px solid var(--color-slate-600);
+  border-radius: 6px;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.AuthModal-input:focus {
+  border-color: var(--color-blue-500);
+}
+
+.AuthModal-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.AuthModal-input::placeholder {
+  color: var(--color-gray-500);
+}
+
+.AuthModal-error {
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--color-red-400);
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 6px;
+}
+
+.AuthModal-submit {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.AuthModal-switch {
+  text-align: center;
+  font-size: 13px;
+  color: var(--color-gray-400);
+}
+
+.AuthModal-switch-link {
+  color: var(--color-blue-400);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: inherit;
+  text-decoration: underline;
+}
+
+.AuthModal-switch-link:hover {
+  color: var(--color-blue-300);
+}

@@ -1,19 +1,15 @@
 import { t } from "@lingui/macro";
-import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { getContract } from "config/contracts";
+import { useAuth } from "context/AuthContext";
 import { selectChainId } from "context/SyntheticsStateContext/selectors/globalSelectors";
 import { useSelector } from "context/SyntheticsStateContext/utils";
 import { ExecutionFee } from "domain/synthetics/fees";
 import { GlvAndGmMarketsInfoData, GlvInfo, MarketInfo, MarketsInfoData } from "domain/synthetics/markets";
 import { TokenData, TokensData } from "domain/synthetics/tokens";
 import { getCommonError, getGmSwapError } from "domain/synthetics/trade/utils/validation";
-import { approveTokens } from "domain/tokens";
 import { useHasOutdatedUi } from "lib/useHasOutdatedUi";
-import { userAnalytics } from "lib/userAnalytics";
-import { TokenApproveClickEvent, TokenApproveResultEvent } from "lib/userAnalytics/types";
-import useWallet from "lib/wallets/useWallet";
 
 import SpinnerIcon from "img/ic_spinner.svg?react";
 
@@ -94,8 +90,7 @@ export const useGmSwapSubmitState = ({
 }: Props): SubmitButtonState => {
   const chainId = useSelector(selectChainId);
   const hasOutdatedUi = useHasOutdatedUi();
-  const { openConnectModal } = useConnectModal();
-  const { account, signer } = useWallet();
+  const { isAuthenticated } = useAuth();
 
   const {
     glvTokenAmount = 0n,
@@ -132,9 +127,10 @@ export const useGmSwapSubmitState = ({
     isFirstBuy,
   });
 
-  const onConnectAccount = useCallback(() => {
-    openConnectModal?.();
-  }, [openConnectModal]);
+  // Sign in is now handled at the UI level - this callback is no longer needed
+  const onSignIn = useCallback(() => {
+    // The Sign In button click is handled by the parent component
+  }, []);
 
   const commonError = getCommonError({
     chainId,
@@ -192,10 +188,10 @@ export const useGmSwapSubmitState = ({
   }, [isApproving, tokensToApprove]);
 
   return useMemo((): SubmitButtonState => {
-    if (!account) {
+    if (!isAuthenticated) {
       return {
-        text: t`Connect Wallet`,
-        onSubmit: onConnectAccount,
+        text: t`Sign In`,
+        onSubmit: onSignIn,
       };
     }
 
@@ -218,61 +214,7 @@ export const useGmSwapSubmitState = ({
       };
     }
 
-    if (isApproving && tokensToApprove.length) {
-      const tokenSymbol = getGmSwapBoxApproveTokenSymbol(tokensToApprove[0], tokensData, glvAndMarketsInfoData);
-
-      return {
-        text: (
-          <>
-            {t`Allow ${tokenSymbol} to be spent`} <SpinnerIcon className="ml-4 animate-spin" />
-          </>
-        ),
-        disabled: true,
-      };
-    }
-
-    if (isAllowanceLoaded && tokensToApprove.length > 0) {
-      const onApprove = () => {
-        const tokenAddress = tokensToApprove[0];
-
-        if (!chainId || isApproving || !tokenAddress) return;
-
-        userAnalytics.pushEvent<TokenApproveClickEvent>({
-          event: "TokenApproveAction",
-          data: {
-            action: "ApproveClick",
-          },
-        });
-
-        approveTokens({
-          setIsApproving,
-          signer,
-          tokenAddress,
-          spender: getContract(chainId, "SyntheticsRouter"),
-          pendingTxns: [],
-          setPendingTxns: () => null,
-          infoTokens: {},
-          chainId,
-          approveAmount: undefined,
-          onApproveFail: () => {
-            userAnalytics.pushEvent<TokenApproveResultEvent>({
-              event: "TokenApproveAction",
-              data: {
-                action: "ApproveFail",
-              },
-            });
-          },
-          permitParams: undefined,
-        });
-      };
-
-      const tokenSymbol = getGmSwapBoxApproveTokenSymbol(tokensToApprove[0], tokensData, glvAndMarketsInfoData);
-
-      return {
-        text: t`Allow ${tokenSymbol} to be spent`,
-        onSubmit: onApprove,
-      };
-    }
+    // Token approvals are no longer needed with API-based submission
 
     const operationTokenSymbol = glvInfo ? "GLV" : "GM";
 
@@ -288,7 +230,7 @@ export const useGmSwapSubmitState = ({
       onSubmit,
     };
   }, [
-    account,
+    isAuthenticated,
     isAllowanceLoading,
     error,
     isApproving,
@@ -298,13 +240,12 @@ export const useGmSwapSubmitState = ({
     isSubmitting,
     isDeposit,
     onSubmit,
-    onConnectAccount,
+    onSignIn,
     shouldDisableValidation,
     swapErrorDescription,
     chainId,
     tokensData,
     glvAndMarketsInfoData,
-    signer,
     operation,
   ]);
 };
