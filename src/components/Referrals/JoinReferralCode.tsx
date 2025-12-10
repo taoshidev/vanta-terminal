@@ -1,5 +1,4 @@
 import { t, Trans } from "@lingui/macro";
-import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { Contract } from "ethers";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { encodeFunctionData, zeroAddress } from "viem";
@@ -49,7 +48,6 @@ import SpinnerIcon from "img/ic_spinner.svg?react";
 import { REFERRAL_CODE_REGEX } from "./referralsHelper";
 
 function JoinReferralCode({ active }: { active: boolean }) {
-  const { openConnectModal } = useConnectModal();
   return (
     <div className="referral-card section-center">
       <h2 className="title text-h2">
@@ -62,8 +60,8 @@ function JoinReferralCode({ active }: { active: boolean }) {
         {active ? (
           <ReferralCodeEditFormContainer />
         ) : (
-          <Button variant="primary-action" className="w-full" type="submit" onClick={openConnectModal}>
-            <Trans>Connect Wallet</Trans>
+          <Button variant="primary-action" className="w-full" type="submit">
+            <Trans>Sign In</Trans>
           </Button>
         )}
       </div>

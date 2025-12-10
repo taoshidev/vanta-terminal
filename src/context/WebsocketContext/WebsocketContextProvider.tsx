@@ -1,8 +1,8 @@
 import { JsonRpcProvider, WebSocketProvider } from "ethers";
 import uniq from "lodash/uniq";
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { useAccount } from "wagmi";
 
+import { useAuth } from "context/AuthContext";
 import { SourceChainId } from "config/chains";
 import { isDevelopment } from "config/env";
 import { isSourceChain } from "config/multichain";
@@ -49,7 +49,9 @@ export function useWebsocketProvider() {
 }
 
 export function WebsocketContextProvider({ children }: { children: ReactNode }) {
-  const { isConnected } = useAccount();
+  const { isAuthenticated } = useAuth();
+  // Consider user as "connected" when authenticated for websocket purposes
+  const isConnected = isAuthenticated;
   const { chainId, srcChainId } = useChainId();
   const [wsProvider, setWsProvider] = useState<WebSocketProvider | JsonRpcProvider>();
   const [additionalSourceChains, setAdditionalSourceChains] =

@@ -521,13 +521,13 @@ const ConnectWalletModalContent = memo(function ConnectWalletModalContent({
       )}
       <div className="text-body-medium text-center text-typography-secondary">
         <Trans>
-          Please connect your wallet to view
+          Please sign in to view
           <br />
           all available payment options
         </Trans>
       </div>
       <ConnectWalletButton onClick={openConnectModal}>
-        <Trans>Connect Wallet</Trans>
+        <Trans>Sign In</Trans>
       </ConnectWalletButton>
     </div>
   );

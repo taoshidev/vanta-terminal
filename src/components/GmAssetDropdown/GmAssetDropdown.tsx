@@ -176,7 +176,7 @@ function AddToWalletButton({
     <Menu.Item as="div">
       <div
         onClick={() => {
-          walletClient.watchAsset({
+          walletClient?.watchAsset?.({
             type: "ERC20",
             options: {
               address,

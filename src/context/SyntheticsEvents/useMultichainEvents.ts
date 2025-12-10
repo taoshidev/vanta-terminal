@@ -3,8 +3,8 @@ import pickBy from "lodash/pickBy";
 import uniqBy from "lodash/uniqBy";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { zeroAddress } from "viem";
-import { useAccount } from "wagmi";
 
+import { useAuth } from "context/AuthContext";
 import { getChainName, SourceChainId } from "config/chains";
 import { getContract } from "config/contracts";
 import {
@@ -92,7 +92,10 @@ export function useMultichainEvents({ hasPageLostFocus }: { hasPageLostFocus: bo
   );
   const { chainId, srcChainId } = useChainId();
 
-  const { address: currentAccount } = useAccount();
+  const { isAuthenticated } = useAuth();
+  // No wallet address - multichain events that require an address won't fire
+  // This is expected since we're using username/password auth instead of wallet auth
+  const currentAccount = undefined as `0x${string}` | undefined;
 
   const { wsProvider, wsSourceChainProviders } = useWebsocketProvider();
   const wsSourceChainProvider = srcChainId ? wsSourceChainProviders[srcChainId] : undefined;

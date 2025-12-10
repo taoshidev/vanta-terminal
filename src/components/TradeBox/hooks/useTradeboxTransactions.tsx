@@ -1,6 +1,7 @@
 import { t } from "@lingui/macro";
 import { useCallback, useId, useMemo } from "react";
 
+import { useAuth } from "context/AuthContext";
 import { useSettings } from "context/SettingsContext/SettingsContextProvider";
 import { useTokensData } from "context/SyntheticsStateContext/hooks/globalsHooks";
 import { selectChartHeaderInfo } from "context/SyntheticsStateContext/selectors/chartSelectors";
@@ -40,12 +41,10 @@ import { useUserReferralCode } from "domain/referrals";
 import { getIsValidExpressParams } from "domain/synthetics/express/expressOrderUtils";
 import { useExpressOrdersParams } from "domain/synthetics/express/useRelayerFeeHandler";
 import { OrderType } from "domain/synthetics/orders";
-import { createStakeOrUnstakeTxn } from "domain/synthetics/orders/createStakeOrUnStakeTxn";
-import { createWrapOrUnwrapTxn } from "domain/synthetics/orders/createWrapOrUnwrapTxn";
-import { sendBatchOrderTxn } from "domain/synthetics/orders/sendBatchOrderTxn";
 import { useOrderTxnCallbacks } from "domain/synthetics/orders/useOrderTxnCallbacks";
 import { formatLeverage } from "domain/synthetics/positions/utils";
 import { TradeMode } from "domain/synthetics/trade";
+import tradeApi, { TradeOrderPayload } from "lib/api/tradeApi";
 import { useChainId } from "lib/chains";
 import { helperToast } from "lib/helperToast";
 import {
@@ -55,10 +54,9 @@ import {
   sendOrderSubmittedMetric,
   sendTxnValidationErrorMetric,
 } from "lib/metrics/utils";
+import { formatUsd } from "lib/numbers";
 import { getByKey } from "lib/objects";
-import { useJsonRpcProvider } from "lib/rpc";
 import { getTradeInteractionKey, sendUserAnalyticsOrderConfirmClickEvent, userAnalytics } from "lib/userAnalytics";
-import useWallet from "lib/wallets/useWallet";
 import { BatchOrderTxnParams, getBatchTotalExecutionFee } from "sdk/utils/orderTransactions";
 
 import { useSidecarOrderPayloads } from "./useSidecarOrderPayloads";
@@ -69,8 +67,7 @@ interface TradeboxTransactionsProps {
 
 export function useTradeboxTransactions({ setPendingTxns }: TradeboxTransactionsProps) {
   const { chainId, srcChainId } = useChainId();
-  const { signer, account } = useWallet();
-  const { provider } = useJsonRpcProvider(chainId);
+  const { user, isAuthenticated } = useAuth();
   const tokensData = useTokensData();
   const { shouldDisableValidationForTesting } = useSettings();
 
@@ -103,7 +100,9 @@ export function useTradeboxTransactions({ setPendingTxns }: TradeboxTransactions
   const selectedPosition = useSelector(selectTradeboxSelectedPosition);
   const executionFee = useSelector(selectTradeboxExecutionFee);
   const triggerPrice = useSelector(selectTradeboxTriggerPrice);
-  const { referralCodeForTxn } = useUserReferralCode(signer, chainId, account);
+  // Pass undefined for account since we don't have a wallet address
+  // Referral codes from localStorage will still work
+  const { referralCodeForTxn } = useUserReferralCode(undefined, chainId, undefined);
 
   const toToken = getByKey(tokensData, toTokenAddress);
 
@@ -288,13 +287,11 @@ export function useTradeboxTransactions({ setPendingTxns }: TradeboxTransactions
   ]);
 
   const onSubmitOrder = useCallback(async () => {
-    const fulfilledExpressParams = await expressParamsPromise;
-
     const metricData = initOrderMetricData();
 
     sendOrderSubmittedMetric(metricData.metricId);
 
-    if (!primaryCreateOrderParams || !signer || !provider || !tokensData || !account || !marketsInfoData) {
+    if (!primaryCreateOrderParams || !user || !isAuthenticated || !tokensData || !marketsInfoData) {
       helperToast.error(t`Error submitting order`);
       sendTxnValidationErrorMetric(metricData.metricId);
       return Promise.reject();
@@ -302,72 +299,110 @@ export function useTradeboxTransactions({ setPendingTxns }: TradeboxTransactions
 
     sendUserAnalyticsOrderConfirmClickEvent(chainId, metricData.metricId);
 
-    return sendBatchOrderTxn({
+    // Build the trade order payload for the API
+    const primaryOrder = primaryCreateOrderParams[0];
+    const orderPayload = primaryOrder?.orderPayload;
+
+    if (!orderPayload || !marketInfo) {
+      helperToast.error(t`Invalid order parameters`);
+      return Promise.reject();
+    }
+
+    // Determine order type for the API
+    let apiOrderType: TradeOrderPayload["orderType"] = "market";
+    const rawOrderType = orderPayload.orderType as number;
+    if (rawOrderType === OrderType.LimitIncrease) {
+      apiOrderType = "limit";
+    } else if (rawOrderType === OrderType.StopLossDecrease) {
+      apiOrderType = "stop-loss";
+    } else if (rawOrderType === OrderType.LimitDecrease) {
+      apiOrderType = "take-profit";
+    }
+
+    const tradePayload: TradeOrderPayload = {
+      userId: user.id,
+      orderType: apiOrderType,
+      side: isLong ? "long" : "short",
+      marketAddress: marketInfo.marketTokenAddress,
+      marketSymbol: marketInfo.name,
+      sizeDeltaUsd: formatUsd(increaseAmounts?.sizeDeltaUsd ?? decreaseAmounts?.sizeDeltaUsd ?? 0n) ?? "0",
+      collateralDeltaUsd: formatUsd(increaseAmounts?.collateralDeltaUsd ?? decreaseAmounts?.collateralDeltaUsd ?? 0n) ?? "0",
+      triggerPrice: triggerPrice ? formatUsd(triggerPrice) ?? undefined : undefined,
+      acceptablePrice: formatUsd((orderPayload as any).acceptablePrice ?? 0n) ?? "0",
+      leverage: increaseAmounts?.estimatedLeverage ? Number(increaseAmounts.estimatedLeverage) / 10000 : 1,
+      isLong,
       chainId,
-      signer,
-      provider,
-      batchParams,
-      isGmxAccount: isFromTokenGmxAccount,
-      expressParams:
-        fulfilledExpressParams && getIsValidExpressParams(fulfilledExpressParams) ? fulfilledExpressParams : undefined,
-      simulationParams: shouldDisableValidationForTesting
-        ? undefined
-        : {
-            tokensData,
-            blockTimestampData,
+      metadata: {
+        referralCode: referralCodeForTxn ?? undefined,
+        slippageBps: allowedSlippage,
+      },
+    };
+
+    try {
+      const response = await tradeApi.submitOrder(tradePayload);
+
+      if (response.success) {
+        helperToast.success(t`Order submitted successfully`);
+
+        // Add to pending transactions for UI tracking
+        setPendingTxns((prev: any[]) => [
+          ...prev,
+          {
+            orderId: response.orderId,
+            type: apiOrderType,
+            market: marketInfo.name,
+            timestamp: Date.now(),
           },
-      callback: makeOrderTxnCallback({
-        metricId: metricData.metricId,
-        slippageInputId,
-        additionalErrorContent: undefined,
-        onInternalSwapFallback: () => {
-          setShouldFallbackToInternalSwap(true);
-        },
-      }),
-    });
+        ]);
+
+        return response;
+      } else {
+        throw new Error(response.error || "Order submission failed");
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      helperToast.error(t`Order failed: ${errorMessage}`);
+      sendTxnValidationErrorMetric(metricData.metricId);
+      throw error;
+    }
   }, [
-    account,
-    batchParams,
-    blockTimestampData,
+    user,
+    isAuthenticated,
     chainId,
-    expressParamsPromise,
     initOrderMetricData,
-    isFromTokenGmxAccount,
-    makeOrderTxnCallback,
     marketsInfoData,
     primaryCreateOrderParams,
-    provider,
-    setShouldFallbackToInternalSwap,
-    shouldDisableValidationForTesting,
-    signer,
-    slippageInputId,
     tokensData,
+    marketInfo,
+    isLong,
+    increaseAmounts,
+    decreaseAmounts,
+    triggerPrice,
+    referralCodeForTxn,
+    allowedSlippage,
+    setPendingTxns,
   ]);
 
+  // Wrap/Unwrap operations are now handled via API as well
   function onSubmitWrapOrUnwrap() {
-    if (!account || !swapAmounts || !fromToken || !signer) {
+    if (!user || !swapAmounts || !fromToken) {
       return Promise.reject();
     }
 
-    return createWrapOrUnwrapTxn(chainId, signer, {
-      amount: swapAmounts.amountIn,
-      isWrap: Boolean(fromToken.isNative),
-      setPendingTxns,
-    });
+    // TODO: Implement wrap/unwrap via API
+    helperToast.info(t`Wrap/Unwrap operations will be available soon`);
+    return Promise.resolve();
   }
 
+  // Stake/Unstake operations are now handled via API as well
   function onSubmitStakeOrUnstake() {
-    if (!account || !swapAmounts || !fromToken || !signer || !toToken) {
+    if (!user || !swapAmounts || !fromToken || !toToken) {
       return Promise.reject();
     }
 
-    return createStakeOrUnstakeTxn(chainId, signer, {
-      amount: swapAmounts.amountIn,
-      isStake: Boolean(toToken.isStaking),
-      isWrapBeforeStake: Boolean(fromToken.isNative),
-      isUnwrapAfterStake: Boolean(toToken.isNative),
-      setPendingTxns,
-    });
+    // TODO: Implement stake/unstake via API
+    helperToast.info(t`Stake/Unstake operations will be available soon`);
+    return Promise.resolve();
   }
 
   return {

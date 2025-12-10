@@ -1,5 +1,3 @@
-import "@wagmi/connectors";
-
 import { i18n } from "@lingui/core";
 import { I18nProvider } from "@lingui/react";
 import { useEffect } from "react";
@@ -31,18 +29,11 @@ import { TokensFavoritesContextProvider } from "context/TokensFavoritesContext/T
 import { WebsocketContextProvider } from "context/WebsocketContext/WebsocketContextProvider";
 import { useChainId } from "lib/chains";
 import { defaultLocale, dynamicActivate } from "lib/i18n";
-import { RainbowKitProviderWrapper } from "lib/wallets/WalletProvider";
 
 import SEO from "components/Seo/SEO";
 
 import { AppRoutes } from "./AppRoutes";
 import { SWRConfigProp } from "./swrConfig";
-
-// @ts-ignore
-if (window?.ethereum?.autoRefreshOnNetworkChange) {
-  // @ts-ignore
-  window.ethereum.autoRefreshOnNetworkChange = false;
-}
 
 function SWRConfigWithKey({ children }: { children: React.ReactNode }) {
   const { chainId } = useChainId();
@@ -68,7 +59,6 @@ function App() {
   app = <TokensBalancesContextProvider>{app}</TokensBalancesContextProvider>;
   app = <WebsocketContextProvider>{app}</WebsocketContextProvider>;
   app = <SEO>{app}</SEO>;
-  app = <RainbowKitProviderWrapper>{app}</RainbowKitProviderWrapper>;
   app = <I18nProvider i18n={i18n as any}>{app}</I18nProvider>;
   app = <PendingTxnsContextProvider>{app}</PendingTxnsContextProvider>;
   app = <SWRConfigWithKey>{app}</SWRConfigWithKey>;

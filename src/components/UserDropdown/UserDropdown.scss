@@ -1,0 +1,59 @@
+.user-menu-items {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 1000;
+  min-width: 220px;
+  padding: 8px;
+  background: var(--color-slate-800);
+  border: 1px solid var(--color-slate-700);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.user-menu-header {
+  padding: 12px;
+  border-bottom: 1px solid var(--color-slate-700);
+  margin-bottom: 4px;
+}
+
+.user-menu-label {
+  display: block;
+  font-size: 12px;
+  color: var(--color-gray-400);
+  margin-bottom: 4px;
+}
+
+.user-menu-username {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-white);
+}
+
+.user-menu-email {
+  display: block;
+  font-size: 12px;
+  color: var(--color-gray-400);
+  margin-top: 2px;
+}
+
+.user-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: var(--color-gray-200);
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background-color 0.15s ease;
+
+  &:hover {
+    background: var(--color-slate-700);
+  }
+
+  p {
+    margin: 0;
+  }
+}

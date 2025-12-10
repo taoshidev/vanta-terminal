@@ -1,11 +1,5 @@
-import React, { createContext, useCallback, useContext, useMemo } from "react";
+import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
 
-import { getTokenPermitsKey, PERMITS_DISABLED_KEY } from "config/localStorage";
-import { createAndSignTokenPermit, getIsPermitExpired, validateTokenPermitSignature } from "domain/tokens/permitUtils";
-import { useChainId } from "lib/chains";
-import { getInvalidPermitSignatureError } from "lib/errors/customErrors";
-import { useLocalStorageSerializeKey } from "lib/localStorage";
-import useWallet from "lib/wallets/useWallet";
 import { SignedTokenPermit } from "sdk/types/tokens";
 
 export type TokenPermitsState = {
@@ -28,79 +22,32 @@ export function useTokenPermitsContext() {
   return context;
 }
 
+/**
+ * Simplified TokenPermitsContextProvider - token permits require wallet signing
+ * which is not available with username/password authentication.
+ * This provider returns stub values that indicate permits are not available.
+ */
 export function TokenPermitsContextProvider({ children }: { children: React.ReactNode }) {
-  const { chainId } = useChainId();
-  const { signer } = useWallet();
+  const [isPermitsDisabled, setIsPermitsDisabled] = useState(true);
 
-  const [isPermitsDisabled, setIsPermitsDisabled] = useLocalStorageSerializeKey<boolean>(PERMITS_DISABLED_KEY, false);
-
-  const [tokenPermits, setTokenPermits] = useLocalStorageSerializeKey<SignedTokenPermit[]>(
-    getTokenPermitsKey(chainId, signer?.address),
-    [],
-    {
-      raw: false,
-      serializer: (val) => {
-        if (!val) {
-          return "";
-        }
-
-        return JSON.stringify(val);
-      },
-      deserializer: (stored) => {
-        if (!stored) {
-          return undefined;
-        }
-
-        try {
-          const parsed = JSON.parse(stored);
-          return parsed.map((permit: any) => ({
-            ...permit,
-            value: BigInt(permit.value),
-            deadline: BigInt(permit.deadline),
-          }));
-        } catch (e) {
-          return undefined;
-        }
-      },
-    }
-  );
-
-  const addTokenPermit = useCallback(
-    async (tokenAddress: string, spenderAddress: string, value: bigint) => {
-      if (!signer?.provider) {
-        return;
-      }
-
-      const { permit } = await createAndSignTokenPermit(chainId, signer, tokenAddress, spenderAddress, value);
-
-      const validationResult = await validateTokenPermitSignature(chainId, permit);
-
-      if (!validationResult.isValid) {
-        throw getInvalidPermitSignatureError({
-          isValid: validationResult.isValid,
-          permit,
-          error: validationResult.error,
-        });
-      }
-
-      setTokenPermits(tokenPermits?.concat(permit) ?? [permit]);
-    },
-    [chainId, setTokenPermits, tokenPermits, signer]
-  );
+  // Token permits are not available without wallet signing
+  const addTokenPermit = useCallback(async () => {
+    // No-op - permits not available without wallet
+  }, []);
 
   const resetTokenPermits = useCallback(() => {
-    setTokenPermits([]);
-  }, [setTokenPermits]);
+    // No-op
+  }, []);
 
   const state = useMemo(
     () => ({
-      isPermitsDisabled: Boolean(isPermitsDisabled),
+      isPermitsDisabled: true, // Always disabled without wallet
       setIsPermitsDisabled,
-      tokenPermits: tokenPermits?.filter((permit) => !getIsPermitExpired(permit)) ?? [],
+      tokenPermits: [],
       addTokenPermit,
       resetTokenPermits,
     }),
-    [isPermitsDisabled, setIsPermitsDisabled, tokenPermits, addTokenPermit, resetTokenPermits]
+    [setIsPermitsDisabled, addTokenPermit, resetTokenPermits]
   );
 
   return <TokenPermitsContext.Provider value={state}>{children}</TokenPermitsContext.Provider>;

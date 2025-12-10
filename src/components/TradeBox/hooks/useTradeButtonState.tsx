@@ -1,5 +1,4 @@
 import { t, Trans } from "@lingui/macro";
-import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 
 import { getBridgingOptionsForToken } from "config/bridging";
@@ -7,6 +6,7 @@ import { BOTANIX, SettlementChainId } from "config/chains";
 import { BASIS_POINTS_DIVISOR } from "config/factors";
 import { get1InchSwapUrlFromAddresses } from "config/links";
 import { MULTICHAIN_TRANSFER_SUPPORTED_TOKENS } from "config/multichain";
+import { useAuth } from "context/AuthContext";
 import {
   useGmxAccountDepositViewTokenAddress,
   useGmxAccountDepositViewTokenInputValue,
@@ -59,7 +59,6 @@ import { useSidecarOrders } from "domain/synthetics/sidecarOrders/useSidecarOrde
 import { getApprovalRequirements } from "domain/synthetics/tokens/utils";
 import { getIncreasePositionAmounts } from "domain/synthetics/trade/utils/increase";
 import { getCommonError, getExpressError, getIsMaxLeverageExceeded } from "domain/synthetics/trade/utils/validation";
-import { useApproveToken } from "domain/tokens/useApproveTokens";
 import { numericBinarySearch } from "lib/binarySearch";
 import { helperToast } from "lib/helperToast";
 import { useLocalizedMap } from "lib/i18n";
@@ -68,7 +67,6 @@ import { sleep } from "lib/sleep";
 import { mustNeverExist } from "lib/types";
 import { useHasOutdatedUi } from "lib/useHasOutdatedUi";
 import { sendUserAnalyticsConnectWalletClickEvent } from "lib/userAnalytics";
-import { useEthersSigner } from "lib/wallets/useEthersSigner";
 import { convertTokenAddress, getToken, getTokenBySymbol, getTokenVisualMultiplier } from "sdk/configs/tokens";
 import { ExecutionFee } from "sdk/types/fees";
 import { TokenData } from "sdk/types/tokens";
@@ -106,7 +104,7 @@ export function useTradeboxButtonState({
   setToTokenInputValue,
 }: TradeboxButtonStateOptions): TradeboxButtonState {
   const chainId = useSelector(selectChainId);
-  const signer = useEthersSigner();
+  const { isAuthenticated, user } = useAuth();
 
   const tradeFlags = useSelector(selectTradeboxTradeFlags);
   const { isSwap, isIncrease, isLimit, isMarket, isTwap } = tradeFlags;
@@ -136,9 +134,8 @@ export function useTradeboxButtonState({
   const isFromTokenGmxAccount = useSelector(selectTradeboxIsFromTokenGmxAccount);
 
   const { setPendingTxns } = usePendingTxns();
-  const { openConnectModal } = useConnectModal();
-
-  const { approveToken } = useApproveToken();
+  // Auth modal is now handled at the AppHeaderUser level
+  const [, setShowAuthModal] = useState(false);
 
   const {
     onSubmitWrapOrUnwrap,
@@ -290,13 +287,10 @@ export function useTradeboxButtonState({
   ]);
 
   const onSubmit = useCallback(async () => {
-    if (!account || !signer) {
+    if (!isAuthenticated || !user) {
       sendUserAnalyticsConnectWalletClickEvent("ActionButton");
-      openConnectModal?.();
-      return;
-    }
-
-    if (!signer) {
+      // User needs to sign in - this is now handled at the UI level
+      helperToast.error(t`Please sign in to trade`);
       return;
     }
 
@@ -320,21 +314,8 @@ export function useTradeboxButtonState({
       return;
     }
 
-    if (!isFromTokenGmxAccount && isAllowanceLoaded && tokensToApprove.length) {
-      const tokenToApprove = tokensToApprove[0];
-
-      if (!chainId || isApproving || !tokenToApprove) return;
-
-      approveToken({
-        tokenAddress: tokenToApprove.tokenAddress,
-        chainId,
-        signer,
-        allowPermit: Boolean(expressParams),
-        setIsApproving,
-      });
-
-      return;
-    }
+    // Token approvals are no longer needed since we're using API-based submission
+    // The backend handles all token operations
 
     setStage("processing");
 
@@ -367,13 +348,11 @@ export function useTradeboxButtonState({
       setStage("trade");
     });
   }, [
-    account,
-    approveToken,
+    isAuthenticated,
+    user,
     chainId,
     expressParams,
     fromToken,
-    isAllowanceLoaded,
-    isApproving,
     isFromTokenGmxAccount,
     isIncrease,
     isStakeOrUnstake,
@@ -384,15 +363,12 @@ export function useTradeboxButtonState({
     onSubmitStakeOrUnstake,
     onSubmitSwap,
     onSubmitWrapOrUnwrap,
-    openConnectModal,
     payAmount,
     setGmxAccountDepositViewTokenAddress,
     setGmxAccountDepositViewTokenInputValue,
     setGmxAccountModalOpen,
     setStage,
     shouldShowDepositButton,
-    signer,
-    tokensToApprove,
   ]);
 
   useEffect(() => {
@@ -412,10 +388,11 @@ export function useTradeboxButtonState({
       isExpressLoading,
     };
 
-    if (!account && buttonErrorText) {
+    // Show "Sign In" button if user is not authenticated
+    if (!isAuthenticated) {
       return {
         ...commonState,
-        text: buttonErrorText,
+        text: t`Sign In`,
         disabled: false,
       };
     }
@@ -539,7 +516,7 @@ export function useTradeboxButtonState({
     batchParams,
     totalExecutionFee,
     isExpressLoading,
-    account,
+    isAuthenticated,
     buttonErrorText,
     shouldShowDepositButton,
     stopLoss.error?.percentage,

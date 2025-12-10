@@ -1,11 +1,10 @@
 import { Trans, t } from "@lingui/macro";
-import { useConnectModal } from "@rainbow-me/rainbowkit";
 import cx from "classnames";
 import type { TransactionResponse } from "ethers";
 import { useEffect, useRef, useState } from "react";
-import { useAccount } from "wagmi";
 
 import { getChainName } from "config/chains";
+import { useAuth } from "context/AuthContext";
 import type { ReferralCodeStats } from "domain/referrals/types";
 import { useChainId } from "lib/chains";
 import { useDebounce } from "lib/debounce/useDebounce";
@@ -32,7 +31,6 @@ function AddAffiliateCode({
   recentlyAddedCodes,
   initialReferralCode,
 }: AddAffiliateCodeProps) {
-  const { openConnectModal } = useConnectModal();
   return (
     <div className="referral-card section-center">
       <h2 className="title">
@@ -52,8 +50,8 @@ function AddAffiliateCode({
             initialReferralCode={initialReferralCode}
           />
         ) : (
-          <Button variant="primary-action" className="w-full" onClick={openConnectModal}>
-            <Trans>Connect Wallet</Trans>
+          <Button variant="primary-action" className="w-full">
+            <Trans>Sign In</Trans>
           </Button>
         )}
       </div>
@@ -81,7 +79,9 @@ export function AffiliateCodeForm({
   const [referralCodeCheckStatus, setReferralCodeCheckStatus] = useState("ok");
   const debouncedReferralCode = useDebounce(referralCode, 300);
   const { chainId, srcChainId } = useChainId();
-  const { address: account, isConnected } = useAccount();
+  const { user, isAuthenticated } = useAuth();
+  // Use undefined for account since we don't have a wallet address
+  const account = undefined as string | undefined;
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -171,7 +171,7 @@ export function AffiliateCodeForm({
       disabled: false,
       onSubmit: (event: React.FormEvent) => {
         event.preventDefault();
-        switchNetwork(chainId, isConnected);
+        switchNetwork(chainId, isAuthenticated);
       },
     };
   } else if (!debouncedReferralCode) {
